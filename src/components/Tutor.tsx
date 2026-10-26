@@ -80,6 +80,7 @@ export function Tutor({ tema, pergunta, resposta }: Props) {
             maxLength={500}
             onChange={(e) => setDuvida(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && perguntar()}
+            enterKeyHint="send"
             placeholder="Ficou alguma dúvida? Pergunte aqui"
           />
           <button className="btn mini" onClick={perguntar} disabled={!duvida.trim()}>Perguntar</button>

@@ -41,7 +41,7 @@ export function DesafioInicio({ quiz, aoComecar, aoSair }: PropsInicio) {
       </p>
       <div>
         <label htmlFor="nome-desafio">Seu nome no placar</label>
-        <input id="nome-desafio" type="text" value={nome} maxLength={MAX_NOME} onChange={(e) => setNome(e.target.value)} onKeyDown={(e) => e.key === "Enter" && comecar()} autoComplete="nickname" />
+        <input id="nome-desafio" type="text" value={nome} maxLength={MAX_NOME} onChange={(e) => setNome(e.target.value)} onKeyDown={(e) => e.key === "Enter" && comecar()} autoComplete="nickname" enterKeyHint="go" />
       </div>
       <div className="acoes">
         <button className="btn primario" onClick={comecar} disabled={!nome.trim()}>Começar</button>

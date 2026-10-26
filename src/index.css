@@ -185,3 +185,40 @@ input[type="number"] { width: 100%; font: inherit; color: var(--tinta); backgrou
 .relogio { font-family: var(--f-mono); }
 input[type="email"] { width: 100%; font: inherit; color: var(--tinta); background: var(--fundo); border: 1px solid var(--linha); border-radius: 10px; padding: 10px 12px; flex: 1 1 200px; min-width: 0; }
 .placar-desafio .lista li > :nth-child(2) { flex: 1; min-width: 0; }
+
+/* Celular */
+.pagina {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(64px, env(safe-area-inset-bottom));
+}
+/* Em listas, o título desce para uma linha própria quando falta espaço, em vez de espremer. */
+.lista li { flex-wrap: wrap; row-gap: 4px; }
+.lista li > :first-child { flex: 1 1 160px; overflow-wrap: anywhere; }
+.placar-desafio .lista li { flex-wrap: nowrap; }
+.placar-desafio .lista li > :first-child { overflow-wrap: normal; }
+.tabela td:first-child { overflow-wrap: break-word; hyphens: auto; }
+button, a, input, select, textarea, label { -webkit-tap-highlight-color: transparent; }
+button { touch-action: manipulation; }
+
+@media (max-width: 480px) {
+  .folha { padding: 18px 16px; }
+  /* As quatro abas dividem a largura toda, sem sair do cartão. */
+  .abas { display: grid; grid-template-columns: repeat(4, 1fr); width: 100%; }
+  .abas button { padding: 9px 4px; font-size: 13px; }
+  /* Coluna menos importante sai da tabela em telas estreitas. */
+  .tabela th:last-child, .tabela td:last-child { display: none; }
+}
+
+/* Dedo precisa de alvo maior que o mouse. */
+@media (pointer: coarse), (max-width: 600px) {
+  .btn.mini { min-height: 40px; padding: 8px 14px; }
+  .abas button { min-height: 42px; }
+  .link { min-height: 40px; }
+  .tipo { padding: 6px 0; }
+  .tipo input, .editor-opcao input[type="radio"] { width: 22px; height: 22px; }
+  .editor-opcao { min-height: 44px; }
+  .miniaturas .remover { width: 36px; height: 36px; }
+}
+.editor-certa { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 4px 8px 0; cursor: pointer; }
+textarea.baixo { field-sizing: content; max-height: 40vh; }

@@ -119,6 +119,7 @@ export function Criar(props: Props) {
               value={tema}
               onChange={(e) => setTema(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !gerando && gerar()}
+              enterKeyHint="go"
               placeholder="Ex.: Revolução Francesa, funções do 2º grau, verbos irregulares em inglês"
             />
           </div>

@@ -130,11 +130,11 @@ export function Pdf({ texto, setTexto, ocupado }: Props) {
         <div className="linha">
           <div>
             <label htmlFor="pdf-de">Da página</label>
-            <input id="pdf-de" type="number" min={1} max={aberto.total} value={de} onChange={(e) => setDe(Number(e.target.value))} />
+            <input id="pdf-de" type="number" inputMode="numeric" min={1} max={aberto.total} value={de} onChange={(e) => setDe(Number(e.target.value))} />
           </div>
           <div>
             <label htmlFor="pdf-ate">Até a página</label>
-            <input id="pdf-ate" type="number" min={1} max={aberto.total} value={ate} onChange={(e) => setAte(Number(e.target.value))} />
+            <input id="pdf-ate" type="number" inputMode="numeric" min={1} max={aberto.total} value={ate} onChange={(e) => setAte(Number(e.target.value))} />
           </div>
         </div>
       )}

@@ -135,7 +135,10 @@ function Lacuna({ p, atual, aoResponder }: PropsTipo & { aoResponder: (digitada:
   const campo = useRef<HTMLInputElement>(null);
   const [antes, depois] = p.pergunta.split(LACUNA);
 
-  useEffect(() => campo.current?.focus(), []);
+  // No celular o teclado cobriria a frase: lá o aluno toca no campo quando quiser.
+  useEffect(() => {
+    if (!window.matchMedia("(pointer: coarse)").matches) campo.current?.focus();
+  }, []);
 
   function conferir() {
     if (digitada.trim()) aoResponder(digitada.trim());
@@ -159,6 +162,10 @@ function Lacuna({ p, atual, aoResponder }: PropsTipo & { aoResponder: (digitada:
             onKeyDown={(e) => e.key === "Enter" && conferir()}
             placeholder="Escreva a palavra que falta"
             autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="done"
           />
           <button className="btn" onClick={conferir} disabled={!digitada.trim()}>Conferir</button>
           <button className="btn" onClick={() => aoResponder("")}>Não sei</button>

@@ -68,7 +68,7 @@ export function Conta({ sessao, sync, motivo, aoFechar }: Props) {
       <div>
         <label htmlFor="email">Ou receba um link no e-mail</label>
         <div className="tutor-entrada">
-          <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrarComEmail()} placeholder="voce@exemplo.com" autoComplete="email" />
+          <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrarComEmail()} placeholder="voce@exemplo.com" autoComplete="email" inputMode="email" enterKeyHint="send" />
           <button className="btn primario" onClick={entrarComEmail} disabled={enviando}>{enviando ? "Enviando…" : "Enviar link"}</button>
         </div>
       </div>
