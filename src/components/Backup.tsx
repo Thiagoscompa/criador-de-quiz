@@ -4,10 +4,11 @@ import { hoje } from "../lib/revisao";
 
 interface Props {
   aoImportar: () => void;
+  logado: boolean;
 }
 
 // Enquanto não há conta, o backup é o jeito de levar os quizzes para outro aparelho.
-export function Backup({ aoImportar }: Props) {
+export function Backup({ aoImportar, logado }: Props) {
   const [arquivo, setArquivo] = useState<unknown>(null);
   const [aviso, setAviso] = useState<{ msg: string; erro: boolean } | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
@@ -46,7 +47,11 @@ export function Backup({ aoImportar }: Props) {
     <section className="folha">
       <div>
         <span className="rotulo">Seus dados</span>
-        <p className="pequeno">Quizzes, revisões e metas ficam só neste navegador. Baixe um backup para não perder nada.</p>
+        <p className="pequeno">
+          {logado
+            ? "Seus dados estão guardados na sua conta. O backup é uma cópia extra em arquivo."
+            : "Quizzes, revisões e metas ficam só neste navegador. Baixe um backup para não perder nada."}
+        </p>
       </div>
       <div className="acoes">
         <button className="btn" onClick={baixar}>Baixar backup</button>

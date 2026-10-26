@@ -17,6 +17,8 @@ interface Props {
   aoAbrirSalvo: (id: string) => void;
   aoEditarSalvo: (id: string) => void;
   aoRevisar: () => void;
+  // Ausente quando o compartilhamento não está configurado.
+  aoDesafiar?: (id: string) => void;
   salvos: QuizSalvo[];
   tentativas: Tentativa[];
   revisao: InfoRevisao;
@@ -193,6 +195,7 @@ export function Criar(props: Props) {
                 <button className="link" onClick={() => props.aoAbrirSalvo(s.id)}>{s.quiz.tema}</button>
                 <span className="pequeno">{s.quiz.perguntas.length} perguntas</span>
                 <button className="btn mini" onClick={() => props.aoEditarSalvo(s.id)}>Editar</button>
+                {props.aoDesafiar && <button className="btn mini" onClick={() => props.aoDesafiar!(s.id)}>Desafiar</button>}
               </li>
             ))}
           </ul>

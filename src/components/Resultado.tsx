@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { mensagemResultado, percentual, respostaCerta, respostaDoAluno, tipoDe, type Quiz, type Resposta } from "../lib/quiz";
 
 interface Props {
@@ -7,9 +8,12 @@ interface Props {
   aoRefazer: () => void;
   aoNovo: () => void;
   aoEditar?: () => void;
+  // Conteúdo extra abaixo do placar (o ranking, num desafio).
+  children?: ReactNode;
+  rotuloNovo?: string;
 }
 
-export function Resultado({ quiz, respostas, aoRefazerErradas, aoRefazer, aoNovo, aoEditar }: Props) {
+export function Resultado({ quiz, respostas, aoRefazerErradas, aoRefazer, aoNovo, aoEditar, children, rotuloNovo = "Novo quiz" }: Props) {
   const acertos = respostas.filter((r) => r.certo).length;
   const errou = acertos < respostas.length;
 
@@ -23,9 +27,10 @@ export function Resultado({ quiz, respostas, aoRefazerErradas, aoRefazer, aoNovo
       <div className="acoes">
         {errou && <button className="btn primario" onClick={aoRefazerErradas}>Refazer só as erradas</button>}
         <button className={errou ? "btn" : "btn primario"} onClick={aoRefazer}>Refazer tudo</button>
-        <button className="btn" onClick={aoNovo}>Novo quiz</button>
+        <button className="btn" onClick={aoNovo}>{rotuloNovo}</button>
         {aoEditar && <button className="btn" onClick={aoEditar}>Corrigir perguntas</button>}
       </div>
+      {children}
       <span className="rotulo">Revisão</span>
       <ul className="revisao">
         {respostas.map((r) => {
