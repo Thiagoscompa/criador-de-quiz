@@ -1,4 +1,4 @@
-import { mensagemResultado, percentual, type Quiz, type Resposta } from "../lib/quiz";
+import { mensagemResultado, percentual, respostaCerta, respostaDoAluno, tipoDe, type Quiz, type Resposta } from "../lib/quiz";
 
 interface Props {
   quiz: Quiz;
@@ -30,16 +30,19 @@ export function Resultado({ quiz, respostas, aoRefazerErradas, aoRefazer, aoNovo
       <ul className="revisao">
         {respostas.map((r) => {
           const p = quiz.perguntas[r.indice];
+          const cartao = tipoDe(p) === "flashcard";
           return (
             <li key={r.indice}>
-              <span className={r.certo ? "chip ok" : "chip ruim"}>{r.certo ? "acertou" : "errou"}</span>
+              <span className={r.certo ? "chip ok" : "chip ruim"}>
+                {cartao ? (r.certo ? "lembrou" : "não lembrou") : r.certo ? "acertou" : "errou"}
+              </span>
               <b>{p.pergunta}</b>
               <span className="pequeno">
-                {r.certo
-                  ? `Resposta: ${p.opcoes[p.correta]}`
-                  : `Você marcou: ${p.opcoes[r.escolhida]} · Certa: ${p.opcoes[p.correta]}`}
+                {r.certo || cartao
+                  ? `Resposta: ${respostaCerta(p)}`
+                  : `Você respondeu: ${respostaDoAluno(p, r)} · Certa: ${respostaCerta(p)}`}
               </span>
-              <span className="pequeno">{p.explicacao}</span>
+              {p.explicacao && <span className="pequeno">{p.explicacao}</span>}
             </li>
           );
         })}

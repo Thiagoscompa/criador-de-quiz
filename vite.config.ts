@@ -6,6 +6,7 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 const ROTAS = {
   "/api/gerar-quiz": { modulo: "/server/gerarQuiz.ts", funcao: "gerarQuiz" },
   "/api/ler-fotos": { modulo: "/server/lerFotos.ts", funcao: "lerFotos" },
+  "/api/tutor": { modulo: "/server/tutor.ts", funcao: "tutor" },
 };
 
 function apiLocal(): Plugin {

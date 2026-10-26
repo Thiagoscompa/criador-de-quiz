@@ -2,13 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gerarQuiz } from "./gerarQuiz.js";
 import { limparLimitesEmMemoria } from "./limite.js";
 import { lerFotos } from "./lerFotos.js";
+import { tutor } from "./tutor.js";
 import { chamarIA } from "./provedores/index.js";
 
 vi.mock("./provedores/index.js", () => ({ chamarIA: vi.fn() }));
 
 const QUIZ = {
   tema: "Sistema solar",
-  perguntas: [{ pergunta: "Maior planeta?", opcoes: ["Terra", "Júpiter", "Marte", "Vênus"], correta: 1, explicacao: "Júpiter." }],
+  perguntas: [
+    { tipo: "multipla", pergunta: "Maior planeta?", opcoes: ["Terra", "Júpiter", "Marte", "Vênus"], correta: 1, resposta: "", explicacao: "Júpiter.", trecho: "" },
+  ],
 };
 const PEDIDO = { modo: "tema", tema: "Sistema solar", quantidade: 5, nivel: "fácil" };
 const FOTO = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
@@ -119,5 +122,41 @@ describe("lerFotos", () => {
     expect(paginas[0]).toEqual({ texto: "A célula é a unidade da vida.", legivel: true, problema: "" });
     expect(paginas[1].legivel).toBe(false);
     expect(vi.mocked(chamarIA).mock.calls[0][1].imagens).toHaveLength(2);
+  });
+});
+
+describe("tutor", () => {
+  const PEDIDO_TUTOR = {
+    tema: "Biologia",
+    tipo: "multipla",
+    pergunta: "Qual organela produz energia?",
+    respostaCerta: "Mitocôndria",
+    respostaAluno: "Ribossomo",
+    acertou: false,
+    explicacao: "A mitocôndria faz a respiração celular.",
+    trecho: "A mitocôndria é a usina de energia da célula.",
+    mensagens: [],
+  };
+
+  it("explica a questão citando o trecho do material", async () => {
+    process.env.OPENAI_API_KEY = "teste";
+    vi.mocked(chamarIA).mockResolvedValue({ ok: true, dados: { resposta: " Pense na mitocôndria como uma usina. " } });
+    const r = await tutor(post("/api/tutor", PEDIDO_TUTOR));
+    expect(r.status).toBe(200);
+    expect((await r.json()).resposta).toBe("Pense na mitocôndria como uma usina.");
+    const prompt = vi.mocked(chamarIA).mock.calls[0][1].prompt;
+    expect(prompt).toContain("usina de energia da célula");
+    expect(prompt).toContain("O aluno errou");
+  });
+
+  it("responde à dúvida do aluno e recusa conversa longa demais", async () => {
+    process.env.OPENAI_API_KEY = "teste";
+    vi.mocked(chamarIA).mockResolvedValue({ ok: true, dados: { resposta: "Sim." } });
+    const conversa = [{ papel: "tutor", texto: "Explicação." }, { papel: "aluno", texto: "E o ribossomo faz o quê?" }];
+    await tutor(post("/api/tutor", { ...PEDIDO_TUTOR, mensagens: conversa }));
+    expect(vi.mocked(chamarIA).mock.calls[0][1].prompt).toContain("Responda à última mensagem do aluno");
+
+    const longa = Array.from({ length: 8 }, (_, i) => ({ papel: i % 2 ? "aluno" : "tutor", texto: "oi" }));
+    expect((await tutor(post("/api/tutor", { ...PEDIDO_TUTOR, mensagens: longa }))).status).toBe(400);
   });
 });

@@ -2,8 +2,9 @@ import { useRef, useState } from "react";
 import { pedirQuiz } from "../lib/api";
 import { QUIZ_EXEMPLO } from "../lib/exemplo";
 import type { QuizSalvo, Tentativa } from "../lib/armazenamento";
-import { LIMITE_TEXTO, NIVEIS, QUANTIDADES, type Nivel, type Quiz } from "../lib/quiz";
+import { LIMITE_TEXTO, NIVEIS, NOMES_TIPO, QUANTIDADES, TIPOS, type Nivel, type Quiz, type Tipo } from "../lib/quiz";
 import { Fotos } from "./Fotos";
+import { Pdf } from "./Pdf";
 
 export interface InfoRevisao {
   vencidas: number;
@@ -21,9 +22,10 @@ interface Props {
   revisao: InfoRevisao;
 }
 
-type Modo = "tema" | "texto" | "fotos";
+type Modo = "tema" | "texto" | "fotos" | "pdf";
 
-const NOMES_MODO: Record<Modo, string> = { tema: "Por tema", texto: "Colar texto", fotos: "Fotos" };
+const MODOS: Modo[] = ["tema", "texto", "fotos", "pdf"];
+const NOMES_MODO: Record<Modo, string> = { tema: "Por tema", texto: "Colar texto", fotos: "Fotos", pdf: "PDF" };
 
 function dataCurta(iso: string): string {
   const [ano, mes, dia] = iso.split("-").map(Number);
@@ -36,6 +38,8 @@ export function Criar(props: Props) {
   const [tema, setTema] = useState("");
   const [texto, setTexto] = useState("");
   const [textoFotos, setTextoFotos] = useState("");
+  const [textoPdf, setTextoPdf] = useState("");
+  const [tipos, setTipos] = useState<Tipo[]>(["multipla"]);
   const [quantidade, setQuantidade] = useState<number>(8);
   const [nivel, setNivel] = useState<Nivel>("médio");
   const [gerando, setGerando] = useState(false);
@@ -43,9 +47,10 @@ export function Criar(props: Props) {
   const controle = useRef<AbortController | null>(null);
 
   async function gerar() {
-    const entrada = (modo === "tema" ? tema : modo === "texto" ? texto : textoFotos).trim();
+    const entrada = { tema, texto, fotos: textoFotos, pdf: textoPdf }[modo].trim();
     if (modo === "tema" && entrada.length < 2) return setAviso({ msg: "Escreva um tema primeiro.", erro: true });
     if (modo === "fotos" && !entrada) return setAviso({ msg: "Leia as fotos antes de gerar o quiz.", erro: true });
+    if (modo === "pdf" && !entrada) return setAviso({ msg: "Extraia o texto do PDF antes de gerar o quiz.", erro: true });
     if (modo !== "tema" && entrada.length < 40) {
       return setAviso({ msg: "O texto está curto demais para um quiz. Use um trecho com pelo menos algumas frases.", erro: true });
     }
@@ -55,8 +60,8 @@ export function Criar(props: Props) {
     try {
       const pedido =
         modo === "tema"
-          ? { modo, tema: entrada, quantidade, nivel }
-          : { modo: "texto" as const, texto: entrada.slice(0, LIMITE_TEXTO), quantidade, nivel };
+          ? { modo, tema: entrada, quantidade, nivel, tipos }
+          : { modo: "texto" as const, texto: entrada.slice(0, LIMITE_TEXTO), quantidade, nivel, tipos };
       const quiz = await pedirQuiz(pedido, controle.current.signal);
       setAviso(null);
       aoComecar(quiz, true);
@@ -68,7 +73,12 @@ export function Criar(props: Props) {
     }
   }
 
-  const podeGerar = modo !== "fotos" || textoFotos.trim().length > 0;
+  const podeGerar = (modo !== "fotos" || textoFotos.trim().length > 0) && (modo !== "pdf" || textoPdf.trim().length > 0);
+
+  function alternarTipo(t: Tipo) {
+    // Sempre sobra pelo menos um tipo marcado.
+    setTipos((atuais) => (atuais.includes(t) ? (atuais.length > 1 ? atuais.filter((x) => x !== t) : atuais) : TIPOS.filter((x) => x === t || atuais.includes(x))));
+  }
 
   return (
     <>
@@ -91,7 +101,7 @@ export function Criar(props: Props) {
       <section className="folha">
         <h2>Monte um quiz para estudar</h2>
         <div className="abas" role="tablist">
-          {(["tema", "texto", "fotos"] as const).map((m) => (
+          {MODOS.map((m) => (
             <button key={m} role="tab" aria-selected={modo === m} onClick={() => { setModo(m); setAviso(null); }}>
               {NOMES_MODO[m]}
             </button>
@@ -128,6 +138,9 @@ export function Criar(props: Props) {
         <div hidden={modo !== "fotos"}>
           <Fotos texto={textoFotos} setTexto={setTextoFotos} ocupado={gerando} />
         </div>
+        <div hidden={modo !== "pdf"}>
+          <Pdf texto={textoPdf} setTexto={setTextoPdf} ocupado={gerando} />
+        </div>
 
         {podeGerar && (
           <>
@@ -146,6 +159,16 @@ export function Criar(props: Props) {
               </div>
             </div>
 
+            <fieldset className="tipos">
+              <legend className="rotulo">Tipos de pergunta</legend>
+              {TIPOS.map((t) => (
+                <label key={t} className="tipo">
+                  <input type="checkbox" checked={tipos.includes(t)} onChange={() => alternarTipo(t)} />
+                  {NOMES_TIPO[t]}
+                </label>
+              ))}
+            </fieldset>
+
             <div className="acoes">
               <button className="btn primario" onClick={gerar} disabled={gerando}>
                 {gerando ? "Gerando…" : "Gerar quiz"}
@@ -153,7 +176,7 @@ export function Criar(props: Props) {
               {gerando ? (
                 <button className="btn" onClick={() => controle.current?.abort()}>Parar</button>
               ) : (
-                modo !== "fotos" && <button className="btn" onClick={() => aoComecar(QUIZ_EXEMPLO, false)}>Usar quiz de exemplo</button>
+                modo !== "fotos" && modo !== "pdf" && <button className="btn" onClick={() => aoComecar(QUIZ_EXEMPLO, false)}>Usar quiz de exemplo</button>
               )}
             </div>
           </>

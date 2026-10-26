@@ -1,3 +1,4 @@
+import { META_PADRAO, podarDias, somarRespondidas, type Estudo } from "./meta";
 import type { Pergunta, Quiz } from "./quiz";
 import { chave, proximaAgenda, separarChave, type Agenda } from "./revisao";
 
@@ -28,6 +29,7 @@ export interface QuizSalvo {
 const CHAVE_HISTORICO = "quiz:historico";
 const CHAVE_SALVOS = "quiz:salvos";
 const CHAVE_REVISAO = "quiz:revisao";
+const CHAVE_ESTUDO = "quiz:estudo";
 const MAX_HISTORICO = 20;
 const MAX_SALVOS = 50;
 
@@ -124,3 +126,57 @@ export const revisao = {
     return { quiz: { tema: "Revisão de hoje", perguntas }, chaves: usadas };
   },
 };
+
+export const estudo = {
+  ler(): Estudo {
+    const e = ler<Partial<Estudo>>(CHAVE_ESTUDO, {});
+    return { meta: typeof e.meta === "number" && e.meta > 0 ? e.meta : META_PADRAO, dias: e.dias ?? {} };
+  },
+  definirMeta(meta: number) {
+    gravar(CHAVE_ESTUDO, { ...this.ler(), meta });
+  },
+  registrar(quantidade: number) {
+    if (quantidade <= 0) return;
+    const atual = this.ler();
+    gravar(CHAVE_ESTUDO, { ...atual, dias: podarDias(somarRespondidas(atual.dias, quantidade)) });
+  },
+};
+
+// Backup: um arquivo JSON com tudo o que o app guarda neste navegador.
+const CHAVES_BACKUP = { salvos: CHAVE_SALVOS, historico: CHAVE_HISTORICO, revisao: CHAVE_REVISAO, estudo: CHAVE_ESTUDO } as const;
+const VERSAO_BACKUP = 1;
+
+export interface Backup {
+  app: "caderno-de-quiz";
+  versao: number;
+  exportadoEm: string;
+  dados: Partial<Record<keyof typeof CHAVES_BACKUP, unknown>>;
+}
+
+export function exportarBackup(): Backup {
+  const dados = Object.fromEntries(
+    Object.entries(CHAVES_BACKUP).map(([nome, chaveArmazenamento]) => [nome, ler<unknown>(chaveArmazenamento, null)]),
+  );
+  return { app: "caderno-de-quiz", versao: VERSAO_BACKUP, exportadoEm: new Date().toISOString(), dados };
+}
+
+// Substitui os dados deste navegador pelos do backup. Devolve uma mensagem de erro, ou null se deu certo.
+export function importarBackup(bruto: unknown): string | null {
+  const b = bruto as Partial<Backup> | null;
+  if (!b || b.app !== "caderno-de-quiz" || typeof b.dados !== "object" || !b.dados) {
+    return "Este arquivo não é um backup do Caderno de Quiz.";
+  }
+  if ((b.versao ?? 0) > VERSAO_BACKUP) return "Este backup foi feito por uma versão mais nova do app.";
+  if (b.dados.salvos != null && !Array.isArray(b.dados.salvos)) return "O backup está corrompido.";
+  for (const [nome, chaveArmazenamento] of Object.entries(CHAVES_BACKUP)) {
+    const valor = b.dados[nome as keyof typeof CHAVES_BACKUP];
+    if (valor == null) {
+      try {
+        localStorage.removeItem(chaveArmazenamento);
+      } catch {
+        // ignora
+      }
+    } else gravar(chaveArmazenamento, valor);
+  }
+  return null;
+}
