@@ -3,9 +3,10 @@ import { METAS, type Sequencia } from "../lib/meta";
 interface Props {
   sequencia: Sequencia;
   aoMudarMeta: (meta: number) => void;
+  aoVerDesempenho: () => void;
 }
 
-export function Meta({ sequencia, aoMudarMeta }: Props) {
+export function Meta({ sequencia, aoMudarMeta, aoVerDesempenho }: Props) {
   const { hoje, meta, dias, bateuHoje } = sequencia;
   const falta = Math.max(0, meta - hoje);
   return (
@@ -30,6 +31,7 @@ export function Meta({ sequencia, aoMudarMeta }: Props) {
         <select id="meta" value={meta} onChange={(e) => aoMudarMeta(Number(e.target.value))}>
           {METAS.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
+        <button className="link pequeno" onClick={aoVerDesempenho}>Ver meu desempenho</button>
       </div>
     </section>
   );

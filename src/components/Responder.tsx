@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { conferirLacuna, LACUNA, NOMES_TIPO, respostaCerta, tipoDe, type Pergunta, type Quiz, type Resposta } from "../lib/quiz";
+import { formatarTempo } from "../lib/desafio";
 import { Tutor } from "./Tutor";
 
 const LETRAS = "ABCDEF";
@@ -7,11 +8,13 @@ const LETRAS = "ABCDEF";
 interface Props {
   quiz: Quiz;
   fila: number[];
+  // Quando definido, mostra um relógio contando desde esse momento (modo desafio).
+  inicio?: number;
   aoTerminar: (respostas: Resposta[]) => void;
   aoSair: () => void;
 }
 
-export function Responder({ quiz, fila, aoTerminar, aoSair }: Props) {
+export function Responder({ quiz, fila, inicio, aoTerminar, aoSair }: Props) {
   const [pos, setPos] = useState(0);
   const [respostas, setRespostas] = useState<Resposta[]>([]);
   const proxima = useRef<HTMLButtonElement>(null);
@@ -42,6 +45,7 @@ export function Responder({ quiz, fila, aoTerminar, aoSair }: Props) {
         <span>{pos + 1}/{fila.length}</span>
         <div className="barra"><i style={{ width: `${(pos / fila.length) * 100}%` }} /></div>
         <span>{acertos} acerto{acertos === 1 ? "" : "s"}</span>
+        {inicio !== undefined && <Relogio inicio={inicio} />}
       </div>
       <span className="etiqueta">{quiz.tema}{tipo !== "multipla" && ` · ${NOMES_TIPO[tipo]}`}</span>
 
@@ -73,6 +77,15 @@ export function Responder({ quiz, fila, aoTerminar, aoSair }: Props) {
       </div>
     </section>
   );
+}
+
+function Relogio({ inicio }: { inicio: number }) {
+  const [agora, setAgora] = useState(Date.now);
+  useEffect(() => {
+    const id = setInterval(() => setAgora(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span className="relogio" aria-label="Tempo">{formatarTempo(agora - inicio)}</span>;
 }
 
 function veredito(p: Pergunta, r: Resposta): string {
