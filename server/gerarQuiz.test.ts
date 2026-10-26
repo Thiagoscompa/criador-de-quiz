@@ -1,38 +1,39 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gerarQuiz } from "./gerarQuiz.js";
-import { gerarComAnthropic } from "./provedores/anthropic.js";
-import { gerarComOpenAI } from "./provedores/openai.js";
+import { limparLimitesEmMemoria } from "./limite.js";
+import { lerFotos } from "./lerFotos.js";
+import { chamarIA } from "./provedores/index.js";
 
-vi.mock("./provedores/openai.js", () => ({ gerarComOpenAI: vi.fn() }));
-vi.mock("./provedores/anthropic.js", () => ({ gerarComAnthropic: vi.fn() }));
+vi.mock("./provedores/index.js", () => ({ chamarIA: vi.fn() }));
 
 const QUIZ = {
   tema: "Sistema solar",
   perguntas: [{ pergunta: "Maior planeta?", opcoes: ["Terra", "Júpiter", "Marte", "Vênus"], correta: 1, explicacao: "Júpiter." }],
 };
+const PEDIDO = { modo: "tema", tema: "Sistema solar", quantidade: 5, nivel: "fácil" };
+const FOTO = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
 
-const chaves = { openai: process.env.OPENAI_API_KEY, anthropic: process.env.ANTHROPIC_API_KEY };
+const ambiente = { ...process.env };
 beforeEach(() => {
   delete process.env.OPENAI_API_KEY;
   delete process.env.ANTHROPIC_API_KEY;
-  vi.mocked(gerarComOpenAI).mockResolvedValue({ ok: true, quiz: QUIZ });
-  vi.mocked(gerarComAnthropic).mockResolvedValue({ ok: true, quiz: QUIZ });
+  delete process.env.LIMITE_DIARIO_POR_VISITANTE;
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.KV_REST_API_URL;
+  limparLimitesEmMemoria();
 });
 afterEach(() => {
-  process.env.OPENAI_API_KEY = chaves.openai;
-  process.env.ANTHROPIC_API_KEY = chaves.anthropic;
+  process.env = { ...ambiente };
   vi.clearAllMocks();
 });
 
-function post(corpo: unknown) {
-  return new Request("http://localhost/api/gerar-quiz", {
+function post(caminho: string, corpo: unknown, ip = "1.1.1.1") {
+  return new Request(`http://localhost${caminho}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "x-forwarded-for": ip },
     body: JSON.stringify(corpo),
   });
 }
-
-const PEDIDO = { modo: "tema", tema: "Sistema solar", quantidade: 5, nivel: "fácil" };
 
 describe("gerarQuiz", () => {
   it("recusa métodos que não são POST", async () => {
@@ -41,38 +42,82 @@ describe("gerarQuiz", () => {
   });
 
   it("avisa quando não há nenhuma chave de IA", async () => {
-    const r = await gerarQuiz(post(PEDIDO));
+    const r = await gerarQuiz(post("/api/gerar-quiz", PEDIDO));
     expect(r.status).toBe(500);
     expect((await r.json()).erro).toMatch(/OPENAI_API_KEY/);
   });
 
   it("valida o pedido antes de chamar a IA", async () => {
     process.env.OPENAI_API_KEY = "teste";
-    const r = await gerarQuiz(post({ modo: "texto", texto: "oi", quantidade: 5, nivel: "fácil" }));
+    const r = await gerarQuiz(post("/api/gerar-quiz", { modo: "texto", texto: "oi", quantidade: 5, nivel: "fácil" }));
     expect(r.status).toBe(400);
-    expect(gerarComOpenAI).not.toHaveBeenCalled();
+    expect(chamarIA).not.toHaveBeenCalled();
   });
 
   it("usa a OpenAI quando OPENAI_API_KEY está definida", async () => {
     process.env.OPENAI_API_KEY = "teste";
     process.env.ANTHROPIC_API_KEY = "teste";
-    const r = await gerarQuiz(post(PEDIDO));
+    vi.mocked(chamarIA).mockResolvedValue({ ok: true, dados: QUIZ });
+    const r = await gerarQuiz(post("/api/gerar-quiz", PEDIDO));
     expect(r.status).toBe(200);
     expect((await r.json()).tema).toBe("Sistema solar");
-    expect(gerarComOpenAI).toHaveBeenCalledOnce();
-    expect(gerarComAnthropic).not.toHaveBeenCalled();
+    expect(vi.mocked(chamarIA).mock.calls[0][0]).toBe("openai");
   });
 
   it("usa o Claude quando só ANTHROPIC_API_KEY está definida", async () => {
     process.env.ANTHROPIC_API_KEY = "teste";
-    await gerarQuiz(post(PEDIDO));
-    expect(gerarComAnthropic).toHaveBeenCalledOnce();
+    vi.mocked(chamarIA).mockResolvedValue({ ok: true, dados: QUIZ });
+    await gerarQuiz(post("/api/gerar-quiz", PEDIDO));
+    expect(vi.mocked(chamarIA).mock.calls[0][0]).toBe("anthropic");
   });
 
   it("repassa o erro do provedor", async () => {
     process.env.OPENAI_API_KEY = "teste";
-    vi.mocked(gerarComOpenAI).mockResolvedValue({ ok: false, status: 429, erro: "Muitos pedidos" });
-    const r = await gerarQuiz(post(PEDIDO));
+    vi.mocked(chamarIA).mockResolvedValue({ ok: false, status: 429, erro: "Muitos pedidos" });
+    const r = await gerarQuiz(post("/api/gerar-quiz", PEDIDO));
     expect(r.status).toBe(429);
+  });
+
+  it("bloqueia o visitante que passa do limite diário, sem afetar outro", async () => {
+    process.env.OPENAI_API_KEY = "teste";
+    process.env.LIMITE_DIARIO_POR_VISITANTE = "2";
+    vi.mocked(chamarIA).mockResolvedValue({ ok: true, dados: QUIZ });
+    expect((await gerarQuiz(post("/api/gerar-quiz", PEDIDO))).status).toBe(200);
+    expect((await gerarQuiz(post("/api/gerar-quiz", PEDIDO))).status).toBe(200);
+    const bloqueado = await gerarQuiz(post("/api/gerar-quiz", PEDIDO));
+    expect(bloqueado.status).toBe(429);
+    expect((await bloqueado.json()).erro).toMatch(/limite de 2/);
+    expect((await gerarQuiz(post("/api/gerar-quiz", PEDIDO, "2.2.2.2"))).status).toBe(200);
+    expect(chamarIA).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("lerFotos", () => {
+  it("recusa pedido sem fotos ou com arquivo que não é imagem", async () => {
+    process.env.OPENAI_API_KEY = "teste";
+    expect((await lerFotos(post("/api/ler-fotos", { imagens: [] }))).status).toBe(400);
+    expect((await lerFotos(post("/api/ler-fotos", { imagens: ["data:text/html;base64,PGI+"] }))).status).toBe(400);
+    expect(chamarIA).not.toHaveBeenCalled();
+  });
+
+  it("recusa mais de 10 fotos", async () => {
+    process.env.OPENAI_API_KEY = "teste";
+    const r = await lerFotos(post("/api/ler-fotos", { imagens: Array(11).fill(FOTO) }));
+    expect(r.status).toBe(400);
+  });
+
+  it("envia as imagens à IA e devolve uma página por foto", async () => {
+    process.env.OPENAI_API_KEY = "teste";
+    vi.mocked(chamarIA).mockResolvedValue({
+      ok: true,
+      dados: { paginas: [{ texto: " A célula é a unidade da vida. ", legivel: true, problema: "" }] },
+    });
+    const r = await lerFotos(post("/api/ler-fotos", { imagens: [FOTO, FOTO] }));
+    expect(r.status).toBe(200);
+    const { paginas } = await r.json();
+    expect(paginas).toHaveLength(2);
+    expect(paginas[0]).toEqual({ texto: "A célula é a unidade da vida.", legivel: true, problema: "" });
+    expect(paginas[1].legivel).toBe(false);
+    expect(vi.mocked(chamarIA).mock.calls[0][1].imagens).toHaveLength(2);
   });
 });

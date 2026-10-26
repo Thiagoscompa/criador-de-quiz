@@ -1,21 +1,37 @@
 import type { Pedido, Quiz } from "./quiz";
 
-export async function pedirQuiz(pedido: Pedido, signal?: AbortSignal): Promise<Quiz> {
+export interface PaginaLida {
+  texto: string;
+  legivel: boolean;
+  problema: string;
+}
+
+async function postar<T>(caminho: string, corpo: unknown, signal?: AbortSignal): Promise<T> {
   let resposta: Response;
   try {
-    resposta = await fetch("/api/gerar-quiz", {
+    resposta = await fetch(caminho, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(pedido),
+      body: JSON.stringify(corpo),
       signal,
     });
   } catch (e) {
     if (signal?.aborted) throw e;
     throw new Error("Sem conexão com o servidor. Verifique sua internet.");
   }
-  const corpo = (await resposta.json().catch(() => null)) as { erro?: string } | Quiz | null;
-  if (!resposta.ok || !corpo || "erro" in corpo) {
-    throw new Error((corpo && "erro" in corpo && corpo.erro) || "Algo deu errado ao gerar o quiz.");
+  const dados = (await resposta.json().catch(() => null)) as ({ erro?: string } & T) | null;
+  if (!resposta.ok || !dados || dados.erro) {
+    if (resposta.status === 413) throw new Error("As fotos ficaram grandes demais. Envie menos fotos por vez.");
+    throw new Error(dados?.erro || "Algo deu errado. Tente de novo.");
   }
-  return corpo as Quiz;
+  return dados;
+}
+
+export function pedirQuiz(pedido: Pedido, signal?: AbortSignal): Promise<Quiz> {
+  return postar<Quiz>("/api/gerar-quiz", pedido, signal);
+}
+
+export async function lerFotos(imagens: string[], signal?: AbortSignal): Promise<PaginaLida[]> {
+  const { paginas } = await postar<{ paginas: PaginaLida[] }>("/api/ler-fotos", { imagens }, signal);
+  return paginas;
 }

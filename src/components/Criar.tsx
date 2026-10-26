@@ -3,20 +3,39 @@ import { pedirQuiz } from "../lib/api";
 import { QUIZ_EXEMPLO } from "../lib/exemplo";
 import type { QuizSalvo, Tentativa } from "../lib/armazenamento";
 import { LIMITE_TEXTO, NIVEIS, QUANTIDADES, type Nivel, type Quiz } from "../lib/quiz";
+import { Fotos } from "./Fotos";
+
+export interface InfoRevisao {
+  vencidas: number;
+  agendadas: number;
+  proxima: string | null;
+}
 
 interface Props {
   aoComecar: (quiz: Quiz, salvar: boolean) => void;
+  aoAbrirSalvo: (id: string) => void;
+  aoEditarSalvo: (id: string) => void;
+  aoRevisar: () => void;
   salvos: QuizSalvo[];
-  aoRemoverSalvo: (id: string) => void;
   tentativas: Tentativa[];
+  revisao: InfoRevisao;
 }
 
-type Modo = "tema" | "texto";
+type Modo = "tema" | "texto" | "fotos";
 
-export function Criar({ aoComecar, salvos, aoRemoverSalvo, tentativas }: Props) {
+const NOMES_MODO: Record<Modo, string> = { tema: "Por tema", texto: "Colar texto", fotos: "Fotos" };
+
+function dataCurta(iso: string): string {
+  const [ano, mes, dia] = iso.split("-").map(Number);
+  return new Date(ano, mes - 1, dia).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
+export function Criar(props: Props) {
+  const { aoComecar, salvos, tentativas, revisao } = props;
   const [modo, setModo] = useState<Modo>("tema");
   const [tema, setTema] = useState("");
   const [texto, setTexto] = useState("");
+  const [textoFotos, setTextoFotos] = useState("");
   const [quantidade, setQuantidade] = useState<number>(8);
   const [nivel, setNivel] = useState<Nivel>("médio");
   const [gerando, setGerando] = useState(false);
@@ -24,10 +43,11 @@ export function Criar({ aoComecar, salvos, aoRemoverSalvo, tentativas }: Props) 
   const controle = useRef<AbortController | null>(null);
 
   async function gerar() {
-    const entrada = modo === "tema" ? tema.trim() : texto.trim();
+    const entrada = (modo === "tema" ? tema : modo === "texto" ? texto : textoFotos).trim();
     if (modo === "tema" && entrada.length < 2) return setAviso({ msg: "Escreva um tema primeiro.", erro: true });
-    if (modo === "texto" && entrada.length < 40) {
-      return setAviso({ msg: "Cole um texto um pouco maior, com pelo menos algumas frases.", erro: true });
+    if (modo === "fotos" && !entrada) return setAviso({ msg: "Leia as fotos antes de gerar o quiz.", erro: true });
+    if (modo !== "tema" && entrada.length < 40) {
+      return setAviso({ msg: "O texto está curto demais para um quiz. Use um trecho com pelo menos algumas frases.", erro: true });
     }
     controle.current = new AbortController();
     setGerando(true);
@@ -36,7 +56,7 @@ export function Criar({ aoComecar, salvos, aoRemoverSalvo, tentativas }: Props) 
       const pedido =
         modo === "tema"
           ? { modo, tema: entrada, quantidade, nivel }
-          : { modo, texto: entrada, quantidade, nivel };
+          : { modo: "texto" as const, texto: entrada.slice(0, LIMITE_TEXTO), quantidade, nivel };
       const quiz = await pedirQuiz(pedido, controle.current.signal);
       setAviso(null);
       aoComecar(quiz, true);
@@ -48,19 +68,37 @@ export function Criar({ aoComecar, salvos, aoRemoverSalvo, tentativas }: Props) 
     }
   }
 
+  const podeGerar = modo !== "fotos" || textoFotos.trim().length > 0;
+
   return (
     <>
+      {revisao.agendadas > 0 && (
+        <section className="folha revisar">
+          <div>
+            <span className="rotulo">Revisar hoje</span>
+            <p className="pequeno">
+              {revisao.vencidas > 0
+                ? `${revisao.vencidas} pergunta${revisao.vencidas === 1 ? "" : "s"} no ponto de revisar, escolhidas pelo que você errou e pelo tempo desde a última vez.`
+                : `Nada para hoje.${revisao.proxima ? ` Próxima revisão em ${dataCurta(revisao.proxima)}.` : ""}`}
+            </p>
+          </div>
+          {revisao.vencidas > 0 && (
+            <button className="btn primario" onClick={props.aoRevisar}>Começar revisão</button>
+          )}
+        </section>
+      )}
+
       <section className="folha">
         <h2>Monte um quiz para estudar</h2>
         <div className="abas" role="tablist">
-          {(["tema", "texto"] as const).map((m) => (
-            <button key={m} role="tab" aria-selected={modo === m} onClick={() => setModo(m)}>
-              {m === "tema" ? "Por tema" : "Colar texto"}
+          {(["tema", "texto", "fotos"] as const).map((m) => (
+            <button key={m} role="tab" aria-selected={modo === m} onClick={() => { setModo(m); setAviso(null); }}>
+              {NOMES_MODO[m]}
             </button>
           ))}
         </div>
 
-        {modo === "tema" ? (
+        {modo === "tema" && (
           <div>
             <label htmlFor="tema">Tema</label>
             <input
@@ -72,7 +110,8 @@ export function Criar({ aoComecar, salvos, aoRemoverSalvo, tentativas }: Props) 
               placeholder="Ex.: Revolução Francesa, funções do 2º grau, verbos irregulares em inglês"
             />
           </div>
-        ) : (
+        )}
+        {modo === "texto" && (
           <div>
             <label htmlFor="texto">Seu material de estudo</label>
             <textarea
@@ -85,32 +124,40 @@ export function Criar({ aoComecar, salvos, aoRemoverSalvo, tentativas }: Props) 
             <p className="dica">{texto.length.toLocaleString("pt-BR")} de {LIMITE_TEXTO.toLocaleString("pt-BR")} caracteres</p>
           </div>
         )}
-
-        <div className="linha">
-          <div>
-            <label htmlFor="quantidade">Perguntas</label>
-            <select id="quantidade" value={quantidade} onChange={(e) => setQuantidade(Number(e.target.value))}>
-              {QUANTIDADES.map((q) => <option key={q} value={q}>{q}</option>)}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="nivel">Nível</label>
-            <select id="nivel" value={nivel} onChange={(e) => setNivel(e.target.value as Nivel)}>
-              {NIVEIS.map((n) => <option key={n} value={n}>{n[0].toUpperCase() + n.slice(1)}</option>)}
-            </select>
-          </div>
+        {/* Fica montado ao trocar de aba para não perder as fotos já escolhidas. */}
+        <div hidden={modo !== "fotos"}>
+          <Fotos texto={textoFotos} setTexto={setTextoFotos} ocupado={gerando} />
         </div>
 
-        <div className="acoes">
-          <button className="btn primario" onClick={gerar} disabled={gerando}>
-            {gerando ? "Gerando…" : "Gerar quiz"}
-          </button>
-          {gerando ? (
-            <button className="btn" onClick={() => controle.current?.abort()}>Parar</button>
-          ) : (
-            <button className="btn" onClick={() => aoComecar(QUIZ_EXEMPLO, false)}>Usar quiz de exemplo</button>
-          )}
-        </div>
+        {podeGerar && (
+          <>
+            <div className="linha">
+              <div>
+                <label htmlFor="quantidade">Perguntas</label>
+                <select id="quantidade" value={quantidade} onChange={(e) => setQuantidade(Number(e.target.value))}>
+                  {QUANTIDADES.map((q) => <option key={q} value={q}>{q}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="nivel">Nível</label>
+                <select id="nivel" value={nivel} onChange={(e) => setNivel(e.target.value as Nivel)}>
+                  {NIVEIS.map((n) => <option key={n} value={n}>{n[0].toUpperCase() + n.slice(1)}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="acoes">
+              <button className="btn primario" onClick={gerar} disabled={gerando}>
+                {gerando ? "Gerando…" : "Gerar quiz"}
+              </button>
+              {gerando ? (
+                <button className="btn" onClick={() => controle.current?.abort()}>Parar</button>
+              ) : (
+                modo !== "fotos" && <button className="btn" onClick={() => aoComecar(QUIZ_EXEMPLO, false)}>Usar quiz de exemplo</button>
+              )}
+            </div>
+          </>
+        )}
         {aviso && <p className={aviso.erro ? "aviso erro" : "aviso"} aria-live="polite">{aviso.msg}</p>}
       </section>
 
@@ -120,9 +167,9 @@ export function Criar({ aoComecar, salvos, aoRemoverSalvo, tentativas }: Props) 
           <ul className="lista">
             {salvos.map((s) => (
               <li key={s.id}>
-                <button className="link" onClick={() => aoComecar(s.quiz, false)}>{s.quiz.tema}</button>
+                <button className="link" onClick={() => props.aoAbrirSalvo(s.id)}>{s.quiz.tema}</button>
                 <span className="pequeno">{s.quiz.perguntas.length} perguntas</span>
-                <button className="btn mini" onClick={() => aoRemoverSalvo(s.id)} aria-label={`Apagar ${s.quiz.tema}`}>Apagar</button>
+                <button className="btn mini" onClick={() => props.aoEditarSalvo(s.id)}>Editar</button>
               </li>
             ))}
           </ul>

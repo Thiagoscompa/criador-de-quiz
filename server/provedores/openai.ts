@@ -1,20 +1,36 @@
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
-import { QuizSchema } from "../../src/lib/quiz.js";
-import { ERRO_INCOMPLETO, ERRO_LIMITE, ERRO_RECUSA, ERRO_SERVICO, type Resultado } from "./tipos.js";
+import type { z } from "zod";
+import { ERRO_INCOMPLETO, ERRO_LIMITE, ERRO_RECUSA, ERRO_SERVICO, type PedidoIA, type Resultado } from "./tipos.js";
 
-// Troque com a variável OPENAI_MODEL (ex.: gpt-5, gpt-5.1).
-const MODELO_PADRAO = "gpt-5-mini";
+// Modelos padrão; troque com OPENAI_MODEL (texto) e OPENAI_MODEL_IMAGEM (leitura de fotos).
+const MODELO_TEXTO = "gpt-5-mini";
+const MODELO_IMAGEM = "gpt-5";
 
 let cliente: OpenAI | null = null;
 
-export async function gerarComOpenAI(prompt: string): Promise<Resultado> {
+export async function chamarOpenAI<S extends z.ZodType>(pedido: PedidoIA<S>): Promise<Resultado<z.infer<S>>> {
   cliente ??= new OpenAI();
+  const comImagens = (pedido.imagens?.length ?? 0) > 0;
+  const modelo = comImagens
+    ? process.env.OPENAI_MODEL_IMAGEM || MODELO_IMAGEM
+    : process.env.OPENAI_MODEL || MODELO_TEXTO;
+
   try {
     const resposta = await cliente.responses.parse({
-      model: process.env.OPENAI_MODEL || MODELO_PADRAO,
-      input: prompt,
-      text: { format: zodTextFormat(QuizSchema, "quiz") },
+      model: modelo,
+      input: comImagens
+        ? [
+            {
+              role: "user",
+              content: [
+                ...pedido.imagens!.map((url) => ({ type: "input_image" as const, image_url: url, detail: "high" as const })),
+                { type: "input_text" as const, text: pedido.prompt },
+              ],
+            },
+          ]
+        : pedido.prompt,
+      text: { format: zodTextFormat(pedido.schema, pedido.nome) },
     });
 
     const recusou = resposta.output.some(
@@ -24,14 +40,14 @@ export async function gerarComOpenAI(prompt: string): Promise<Resultado> {
     if (resposta.status === "incomplete" || !resposta.output_parsed) {
       return { ok: false, status: 502, erro: ERRO_INCOMPLETO };
     }
-    return { ok: true, quiz: resposta.output_parsed };
+    return { ok: true, dados: resposta.output_parsed as z.infer<S> };
   } catch (e) {
     if (e instanceof OpenAI.RateLimitError) return { ok: false, status: 429, erro: ERRO_LIMITE };
     if (e instanceof OpenAI.AuthenticationError) {
       return { ok: false, status: 500, erro: "A chave da API da OpenAI é inválida." };
     }
     if (e instanceof OpenAI.NotFoundError) {
-      return { ok: false, status: 500, erro: "O modelo configurado em OPENAI_MODEL não existe ou não está liberado na sua conta." };
+      return { ok: false, status: 500, erro: `O modelo ${modelo} não existe ou não está liberado na sua conta da OpenAI.` };
     }
     if (e instanceof OpenAI.APIError) {
       console.error("Erro da API OpenAI", e.status, e.message);

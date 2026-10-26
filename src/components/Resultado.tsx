@@ -6,9 +6,10 @@ interface Props {
   aoRefazerErradas: () => void;
   aoRefazer: () => void;
   aoNovo: () => void;
+  aoEditar?: () => void;
 }
 
-export function Resultado({ quiz, respostas, aoRefazerErradas, aoRefazer, aoNovo }: Props) {
+export function Resultado({ quiz, respostas, aoRefazerErradas, aoRefazer, aoNovo, aoEditar }: Props) {
   const acertos = respostas.filter((r) => r.certo).length;
   const errou = acertos < respostas.length;
 
@@ -23,6 +24,7 @@ export function Resultado({ quiz, respostas, aoRefazerErradas, aoRefazer, aoNovo
         {errou && <button className="btn primario" onClick={aoRefazerErradas}>Refazer só as erradas</button>}
         <button className={errou ? "btn" : "btn primario"} onClick={aoRefazer}>Refazer tudo</button>
         <button className="btn" onClick={aoNovo}>Novo quiz</button>
+        {aoEditar && <button className="btn" onClick={aoEditar}>Corrigir perguntas</button>}
       </div>
       <span className="rotulo">Revisão</span>
       <ul className="revisao">
