@@ -2,25 +2,35 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 
-// Em desenvolvimento, atende /api/gerar-quiz com o mesmo código da função da Vercel.
+// Em desenvolvimento, atende as rotas de /api com o mesmo código das funções da Vercel.
+const ROTAS = {
+  "/api/gerar-quiz": { modulo: "/server/gerarQuiz.ts", funcao: "gerarQuiz" },
+  "/api/ler-fotos": { modulo: "/server/lerFotos.ts", funcao: "lerFotos" },
+};
+
 function apiLocal(): Plugin {
   return {
     name: "api-local",
     configureServer(server) {
-      server.middlewares.use("/api/gerar-quiz", async (req, res) => {
-        const partes: Buffer[] = [];
-        for await (const parte of req) partes.push(parte as Buffer);
-        const request = new Request(`http://localhost${req.url ?? ""}`, {
-          method: req.method,
-          headers: { "content-type": req.headers["content-type"] ?? "application/json" },
-          body: req.method === "POST" ? Buffer.concat(partes) : undefined,
+      for (const [caminho, { modulo, funcao }] of Object.entries(ROTAS)) {
+        server.middlewares.use(caminho, async (req, res) => {
+          const partes: Buffer[] = [];
+          for await (const parte of req) partes.push(parte as Buffer);
+          const request = new Request(`http://localhost${req.url ?? ""}`, {
+            method: req.method,
+            headers: {
+              "content-type": req.headers["content-type"] ?? "application/json",
+              "x-forwarded-for": req.socket.remoteAddress ?? "local",
+            },
+            body: req.method === "POST" ? Buffer.concat(partes) : undefined,
+          });
+          const mod = await server.ssrLoadModule(modulo);
+          const response: Response = await mod[funcao](request);
+          res.statusCode = response.status;
+          response.headers.forEach((valor, chave) => res.setHeader(chave, valor));
+          res.end(await response.text());
         });
-        const { gerarQuiz } = await server.ssrLoadModule("/server/gerarQuiz.ts");
-        const response: Response = await gerarQuiz(request);
-        res.statusCode = response.status;
-        response.headers.forEach((valor, chave) => res.setHeader(chave, valor));
-        res.end(await response.text());
-      });
+      }
     },
   };
 }

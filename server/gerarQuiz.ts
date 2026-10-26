@@ -1,44 +1,25 @@
-import { montarPrompt, normalizarQuiz, PedidoSchema } from "../src/lib/quiz.js";
-import { gerarComAnthropic } from "./provedores/anthropic.js";
-import { gerarComOpenAI } from "./provedores/openai.js";
-import type { Resultado } from "./provedores/tipos.js";
-
-function json(status: number, corpo: unknown): Response {
-  return new Response(JSON.stringify(corpo), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8" },
-  });
-}
-
-// Usa a OpenAI se OPENAI_API_KEY estiver definida; senão, o Claude com ANTHROPIC_API_KEY.
-function escolherProvedor(): ((prompt: string) => Promise<Resultado>) | null {
-  if (process.env.OPENAI_API_KEY) return gerarComOpenAI;
-  if (process.env.ANTHROPIC_API_KEY) return gerarComAnthropic;
-  return null;
-}
+import { montarPrompt, normalizarQuiz, PedidoSchema, QuizSchema } from "../src/lib/quiz.js";
+import { ERRO_SEM_CHAVE, json, lerJson, provedorConfigurado } from "./http.js";
+import { consumirLimite } from "./limite.js";
+import { chamarIA } from "./provedores/index.js";
 
 export async function gerarQuiz(request: Request): Promise<Response> {
   if (request.method !== "POST") return json(405, { erro: "Use POST." });
-  const provedor = escolherProvedor();
-  if (!provedor) {
-    return json(500, { erro: "O servidor está sem chave de IA. Defina OPENAI_API_KEY ou ANTHROPIC_API_KEY." });
-  }
+  const provedor = provedorConfigurado();
+  if (!provedor) return json(500, { erro: ERRO_SEM_CHAVE });
 
-  let corpo: unknown;
-  try {
-    corpo = await request.json();
-  } catch {
-    return json(400, { erro: "Pedido inválido." });
-  }
-  const pedido = PedidoSchema.safeParse(corpo);
+  const pedido = PedidoSchema.safeParse(await lerJson(request));
   if (!pedido.success) {
     return json(400, { erro: "Confira o tema ou o texto: o texto precisa ter pelo menos algumas frases." });
   }
 
+  const limite = await consumirLimite(request);
+  if (!limite.ok) return json(429, { erro: limite.erro });
+
   try {
-    const resultado = await provedor(montarPrompt(pedido.data));
+    const resultado = await chamarIA(provedor, { schema: QuizSchema, nome: "quiz", prompt: montarPrompt(pedido.data) });
     if (!resultado.ok) return json(resultado.status, { erro: resultado.erro });
-    const quiz = normalizarQuiz(resultado.quiz);
+    const quiz = normalizarQuiz(resultado.dados);
     if (!quiz) return json(502, { erro: "Não saiu nenhuma pergunta válida. Tente gerar de novo." });
     return json(200, quiz);
   } catch (e) {
