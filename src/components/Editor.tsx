@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { PerguntaSalva, QuizGuardado } from "../lib/armazenamento";
 import { problemaDaPergunta } from "../lib/editar";
+import { LACUNA, NOMES_TIPO, OPCOES_VF, tipoDe } from "../lib/quiz";
 
 const LETRAS = "ABCDEF";
 
@@ -33,9 +34,11 @@ export function Editor({ quiz, aoSalvar, aoCancelar, aoApagarQuiz }: Props) {
     }
     // Tira alternativas vazias e reajusta o índice da certa.
     const limpas = perguntas.map((p) => {
+      const comum = { ...p, pergunta: p.pergunta.trim(), explicacao: p.explicacao.trim(), resposta: p.resposta?.trim() };
+      if (tipoDe(p) !== "multipla") return comum;
       const certa = p.opcoes[p.correta];
       const opcoes = p.opcoes.map((o) => o.trim()).filter(Boolean);
-      return { ...p, pergunta: p.pergunta.trim(), explicacao: p.explicacao.trim(), opcoes, correta: opcoes.indexOf(certa.trim()) };
+      return { ...comum, opcoes, correta: opcoes.indexOf(certa.trim()) };
     });
     aoSalvar({ tema: tema.trim() || quiz.tema, perguntas: limpas });
   }
@@ -52,7 +55,7 @@ export function Editor({ quiz, aoSalvar, aoCancelar, aoApagarQuiz }: Props) {
         {perguntas.map((p, n) => (
           <li key={p.id} className="editor-item">
             <div className="editor-topo">
-              <span className="etiqueta">Pergunta {n + 1}</span>
+              <span className="etiqueta">Pergunta {n + 1} · {NOMES_TIPO[tipoDe(p)]}</span>
               <button className="btn mini" onClick={() => setPerguntas((a) => a.filter((q) => q.id !== p.id))}>Apagar pergunta</button>
             </div>
             <textarea
@@ -62,29 +65,54 @@ export function Editor({ quiz, aoSalvar, aoCancelar, aoApagarQuiz }: Props) {
               value={p.pergunta}
               onChange={(e) => alterar(p.id, { pergunta: e.target.value })}
             />
-            <fieldset className="editor-opcoes">
-              <legend className="pequeno">Alternativas (marque a certa)</legend>
-              {p.opcoes.map((o, i) => (
-                <div key={i} className="editor-opcao">
-                  <input
-                    type="radio"
-                    id={`certa-${p.id}-${i}`}
-                    name={`certa-${p.id}`}
-                    checked={p.correta === i}
-                    onChange={() => alterar(p.id, { correta: i })}
-                    aria-label={`Marcar ${LETRAS[i]} como certa`}
-                  />
-                  <span className="letra">{LETRAS[i]}</span>
-                  <input
-                    type="text"
-                    id={`opcao-${p.id}-${i}`}
-                    aria-label={`Alternativa ${LETRAS[i]}`}
-                    value={o}
-                    onChange={(e) => alterarOpcao(p, i, e.target.value)}
-                  />
-                </div>
-              ))}
-            </fieldset>
+            {tipoDe(p) === "multipla" && (
+              <fieldset className="editor-opcoes">
+                <legend className="pequeno">Alternativas (marque a certa)</legend>
+                {p.opcoes.map((o, i) => (
+                  <div key={i} className="editor-opcao">
+                    <input
+                      type="radio"
+                      id={`certa-${p.id}-${i}`}
+                      name={`certa-${p.id}`}
+                      checked={p.correta === i}
+                      onChange={() => alterar(p.id, { correta: i })}
+                      aria-label={`Marcar ${LETRAS[i]} como certa`}
+                    />
+                    <span className="letra">{LETRAS[i]}</span>
+                    <input
+                      type="text"
+                      id={`opcao-${p.id}-${i}`}
+                      aria-label={`Alternativa ${LETRAS[i]}`}
+                      value={o}
+                      onChange={(e) => alterarOpcao(p, i, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </fieldset>
+            )}
+            {tipoDe(p) === "vf" && (
+              <fieldset className="editor-opcoes">
+                <legend className="pequeno">A afirmação é</legend>
+                {OPCOES_VF.map((o, i) => (
+                  <label key={o} className="editor-opcao pequeno">
+                    <input type="radio" name={`certa-${p.id}`} checked={p.correta === i} onChange={() => alterar(p.id, { correta: i })} />
+                    {o}
+                  </label>
+                ))}
+              </fieldset>
+            )}
+            {(tipoDe(p) === "lacuna" || tipoDe(p) === "flashcard") && (
+              <div>
+                <label htmlFor={`resposta-${p.id}`}>{tipoDe(p) === "lacuna" ? "Palavra que falta" : "Verso do cartão"}</label>
+                <input
+                  type="text"
+                  id={`resposta-${p.id}`}
+                  value={p.resposta ?? ""}
+                  onChange={(e) => alterar(p.id, { resposta: e.target.value })}
+                />
+                {tipoDe(p) === "lacuna" && <p className="dica">Na frase, a lacuna é marcada com {LACUNA}.</p>}
+              </div>
+            )}
             <label htmlFor={`explicacao-${p.id}`}>Explicação</label>
             <textarea
               id={`explicacao-${p.id}`}

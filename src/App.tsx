@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { Backup } from "./components/Backup";
 import { Criar, type InfoRevisao } from "./components/Criar";
 import { Editor } from "./components/Editor";
+import { Meta } from "./components/Meta";
 import { Responder } from "./components/Responder";
 import { Resultado } from "./components/Resultado";
-import { historico, revisao, salvos as armazenados, type QuizSalvo } from "./lib/armazenamento";
+import { estudo, historico, revisao, salvos as armazenados, type QuizSalvo } from "./lib/armazenamento";
+import { calcularSequencia } from "./lib/meta";
 import type { Quiz, Resposta } from "./lib/quiz";
 import { chave, proximaData, vencidas } from "./lib/revisao";
 
@@ -36,10 +39,17 @@ export default function App() {
   const [salvos, setSalvos] = useState(() => armazenados.listar());
   const [tentativas, setTentativas] = useState(() => historico.listar());
   const [infoRevisao, setInfoRevisao] = useState(lerRevisao);
+  const [sequencia, setSequencia] = useState(() => calcularSequencia(estudo.ler()));
 
   function atualizarListas() {
     setSalvos(armazenados.listar());
     setInfoRevisao(lerRevisao());
+  }
+
+  function atualizarTudo() {
+    atualizarListas();
+    setTentativas(historico.listar());
+    setSequencia(calcularSequencia(estudo.ler()));
   }
 
   function irPara(t: Tela) {
@@ -83,8 +93,10 @@ export default function App() {
       total: respostas.length,
       quando: Date.now(),
     });
+    estudo.registrar(respostas.length);
     setTentativas(historico.listar());
     setInfoRevisao(lerRevisao());
+    setSequencia(calcularSequencia(estudo.ler()));
     irPara({ nome: "resultado", sessao, respostas });
   }
 
@@ -101,6 +113,16 @@ export default function App() {
       </header>
 
       {tela.nome === "criar" && (
+        <Meta
+          sequencia={sequencia}
+          aoMudarMeta={(meta) => {
+            estudo.definirMeta(meta);
+            setSequencia(calcularSequencia(estudo.ler()));
+          }}
+        />
+      )}
+
+      {tela.nome === "criar" && (
         <Criar
           aoComecar={aoComecar}
           aoAbrirSalvo={aoAbrirSalvo}
@@ -111,6 +133,8 @@ export default function App() {
           revisao={infoRevisao}
         />
       )}
+
+      {tela.nome === "criar" && <Backup aoImportar={atualizarTudo} />}
 
       {tela.nome === "responder" && (
         <Responder

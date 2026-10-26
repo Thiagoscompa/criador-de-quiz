@@ -1,4 +1,5 @@
 import type { Pedido, Quiz } from "./quiz";
+import type { PedidoTutor } from "./tutor";
 
 export interface PaginaLida {
   texto: string;
@@ -34,4 +35,9 @@ export function pedirQuiz(pedido: Pedido, signal?: AbortSignal): Promise<Quiz> {
 export async function lerFotos(imagens: string[], signal?: AbortSignal): Promise<PaginaLida[]> {
   const { paginas } = await postar<{ paginas: PaginaLida[] }>("/api/ler-fotos", { imagens }, signal);
   return paginas;
+}
+
+export async function perguntarTutor(pedido: PedidoTutor, signal?: AbortSignal): Promise<string> {
+  const { resposta } = await postar<{ resposta: string }>("/api/tutor", pedido, signal);
+  return resposta;
 }

@@ -118,3 +118,37 @@ textarea.baixo { min-height: 72px; }
 .editor-opcao input[type="text"] { flex: 1; min-width: 0; }
 .editor-opcao input[type="radio"] { width: 18px; height: 18px; accent-color: var(--ok); }
 .btn.perigo { background: var(--ruim); border-color: var(--ruim); color: var(--papel); }
+
+/* Tipos de pergunta */
+.tipos { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.tipos legend { padding: 0; }
+.tipo { display: flex; align-items: center; gap: 6px; font-weight: 400; font-size: 15px; margin: 0; cursor: pointer; }
+.tipo input { width: 18px; height: 18px; accent-color: var(--destaque); }
+.opcoes.vf { flex-direction: row; }
+.opcoes.vf li { flex: 1; }
+.opcoes.vf .opcao { justify-content: center; font-weight: 700; }
+.lacuna { display: inline-block; min-width: 4ch; border-bottom: 3px solid var(--marca-texto); padding: 0 4px; }
+.lacuna.ok { color: var(--ok); border-color: var(--ok); }
+.lacuna.ruim { color: var(--ruim); border-color: var(--ruim); text-decoration: line-through; }
+.cartao { border: 1.5px solid var(--linha); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 8px; background: var(--fundo); }
+.cartao .verso { margin: 0; font-size: 18px; }
+input[type="number"] { width: 100%; font: inherit; color: var(--tinta); background: var(--fundo); border: 1px solid var(--linha); border-radius: 10px; padding: 10px 12px; }
+
+/* Tutor */
+.tutor { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--linha); padding-top: 10px; margin-top: 6px; }
+.tutor .rotulo { margin: 0; }
+.fala { margin: 0; }
+.fala.aluno { align-self: flex-end; background: var(--papel); border: 1px solid var(--linha); border-radius: 10px; padding: 6px 10px; max-width: 85%; }
+.tutor-entrada { display: flex; gap: 8px; flex-wrap: wrap; }
+.tutor-entrada input { flex: 1 1 200px; min-width: 0; }
+.explicacao > .btn.mini { width: fit-content; margin-top: 4px; }
+
+/* Meta diária */
+.folha.meta { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.meta-numeros { display: flex; align-items: center; gap: 20px; flex: 1 1 300px; min-width: 0; }
+.meta-numeros b { font-family: var(--f-titulo); font-size: 44px; line-height: 1; display: block; }
+.meta-hoje { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.meta-hoje .rotulo, .meta-hoje .pequeno { margin: 0; }
+.meta-escolha { flex: 0 0 150px; }
+.meta-hoje .barra { flex: none; }
+@media (max-width: 480px) { .abas button { padding: 7px 10px; white-space: nowrap; } }
