@@ -70,15 +70,18 @@ export function Editor({ quiz, aoSalvar, aoCancelar, aoApagarQuiz }: Props) {
                 <legend className="pequeno">Alternativas (marque a certa)</legend>
                 {p.opcoes.map((o, i) => (
                   <div key={i} className="editor-opcao">
-                    <input
-                      type="radio"
-                      id={`certa-${p.id}-${i}`}
-                      name={`certa-${p.id}`}
-                      checked={p.correta === i}
-                      onChange={() => alterar(p.id, { correta: i })}
-                      aria-label={`Marcar ${LETRAS[i]} como certa`}
-                    />
-                    <span className="letra">{LETRAS[i]}</span>
+                    {/* O rótulo deixa a letra também marcar a certa: alvo maior para o dedo. */}
+                    <label className="editor-certa">
+                      <input
+                        type="radio"
+                        id={`certa-${p.id}-${i}`}
+                        name={`certa-${p.id}`}
+                        checked={p.correta === i}
+                        onChange={() => alterar(p.id, { correta: i })}
+                        aria-label={`Marcar ${LETRAS[i]} como certa`}
+                      />
+                      <span className="letra">{LETRAS[i]}</span>
+                    </label>
                     <input
                       type="text"
                       id={`opcao-${p.id}-${i}`}
